@@ -670,8 +670,8 @@ fetch('companies.json')
   .then(res => res.json())
   .then(data => {
     companiesData = data;
-    // 你可以在这里初始化页面
     setGroupTitleColors();
+    enableGroupTitleTooltip();
   });
 
 let currentGroupKey = '';
@@ -768,39 +768,88 @@ function showVerticalList() {
     setDetailPageColor(currentColor);
 }
 
-// 添加新的函数来处理鼠标悬停事件
-function handleGroupHover(event, key) {
-    const companies = companiesData[key] || [];
-    const count = companies.length;
+// 事件委托：分组按钮悬停显示企业数量（气泡挂body上，防止被遮挡）
+function enableGroupTitleTooltip() {
+    const mainContainer = document.querySelector('.main-container');
+    if (!mainContainer) return;
+    mainContainer.addEventListener('mouseover', function(e) {
+        const el = e.target;
+        if (el.classList.contains('group-title') && el.classList.contains('interactive')) {
+            // 防止重复添加
+            if (document.querySelector('.group-tooltip')) return;
+            const key = el.getAttribute('onclick').match(/'([^']+)'/)[1];
+            const companies = companiesData[key] || [];
+            const count = companies.length;
+            const rect = el.getBoundingClientRect();
+            const tooltip = document.createElement('div');
+            tooltip.className = 'group-tooltip';
+            tooltip.style.cssText = `
+                position: fixed;
+                background: rgba(0, 0, 0, 0.85);
+                color: white;
+                padding: 6px 14px;
+                border-radius: 6px;
+                font-size: 15px;
+                left: ${rect.left + rect.width/2}px;
+                top: ${rect.top - 38}px;
+                transform: translateX(-50%);
+                white-space: nowrap;
+                z-index: 99999;
+                pointer-events: none;
+                box-shadow: 0 2px 8px #0008;
+            `;
+            tooltip.textContent = `共有 ${count} 家企业`;
+            document.body.appendChild(tooltip);
+        }
+    });
+    mainContainer.addEventListener('mouseout', function(e) {
+        if (e.target.classList.contains('group-title') && e.target.classList.contains('interactive')) {
+            const tooltip = document.querySelector('.group-tooltip');
+            if (tooltip) tooltip.remove();
+        }
+    });
+}
+
+// 新增：顶层色块悬停显示企业总数（必须在DOMContentLoaded里绑定）
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.top-label').forEach(el => {
+        if(el.classList.contains('shangyou-label')) el.onmouseenter = e=>handleTopLabelHover(e,'shangyou');
+        if(el.classList.contains('zhongyou-label')) el.onmouseenter = e=>handleTopLabelHover(e,'zhongyou');
+        if(el.classList.contains('xiayou-label')) el.onmouseenter = e=>handleTopLabelHover(e,'xiayou');
+    });
+});
+
+// 新增：顶层色块悬停显示企业总数
+function handleTopLabelHover(event, type) {
+    // type: 'shangyou' | 'zhongyou' | 'xiayou'
+    let keys = [];
+    if(type === 'shangyou') keys = ['chip','cloud','data'];
+    else if(type === 'zhongyou') keys = ['llm','vertical','keytech'];
+    else if(type === 'xiayou') keys = ['enterprise','consumer','industry'];
+    let total = 0;
+    keys.forEach(k => { total += (companiesData[k]||[]).length; });
     const tooltip = document.createElement('div');
     tooltip.style.cssText = `
         position: absolute;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 5px 10px;
-        border-radius: 4px;
-        font-size: 14px;
-        top: -30px;
         left: 50%;
+        top: 100%;
         transform: translateX(-50%);
+        margin-top: 8px;
+        background: rgba(0,0,0,0.85);
+        color: #fff;
+        padding: 7px 18px;
+        border-radius: 8px;
+        font-size: 16px;
         white-space: nowrap;
-        z-index: 1000;
+        z-index: 9999;
+        pointer-events: none;
     `;
-    tooltip.textContent = `共有 ${count} 家企业`;
+    tooltip.textContent = `共 ${total} 家企业`;
     event.target.appendChild(tooltip);
-    
     event.target.addEventListener('mouseleave', () => {
         tooltip.remove();
     }, { once: true });
 }
-
-// 修改所有group-title的onclick属性，添加onmouseover事件
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.group-title.interactive').forEach(el => {
-        const key = el.getAttribute('onclick').match(/'([^']+)'/)[1];
-        el.setAttribute('onmouseover', `handleGroupHover(event, '${key}')`);
-    });
-});
 
 // 新增：根据企业数量动态设置按钮颜色深浅
 function setGroupTitleColors() {
@@ -849,48 +898,6 @@ function setGroupTitleColors() {
         el.style.color = '#222';
     });
 }
-
-// 新增：顶层色块悬停显示企业总数
-function handleTopLabelHover(event, type) {
-    // type: 'shangyou' | 'zhongyou' | 'xiayou'
-    let keys = [];
-    if(type === 'shangyou') keys = ['chip','cloud','data'];
-    else if(type === 'zhongyou') keys = ['llm','vertical','keytech'];
-    else if(type === 'xiayou') keys = ['enterprise','consumer','industry'];
-    let total = 0;
-    keys.forEach(k => { total += (companiesData[k]||[]).length; });
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = `
-        position: absolute;
-        left: 50%;
-        top: 100%;
-        transform: translateX(-50%);
-        margin-top: 8px;
-        background: rgba(0,0,0,0.85);
-        color: #fff;
-        padding: 7px 18px;
-        border-radius: 8px;
-        font-size: 16px;
-        white-space: nowrap;
-        z-index: 9999;
-        pointer-events: none;
-    `;
-    tooltip.textContent = `共 ${total} 家企业`;
-    event.target.appendChild(tooltip);
-    event.target.addEventListener('mouseleave', () => {
-        tooltip.remove();
-    }, { once: true });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    // ... existing code ...
-    // 新增：为顶层色块添加悬停事件
-    document.querySelectorAll('.top-label').forEach(el => {
-        if(el.classList.contains('shangyou-label')) el.onmouseover = e=>handleTopLabelHover(e,'shangyou');
-        if(el.classList.contains('zhongyou-label')) el.onmouseover = e=>handleTopLabelHover(e,'zhongyou');
-        if(el.classList.contains('xiayou-label')) el.onmouseover = e=>handleTopLabelHover(e,'xiayou');
-    });
-});
 </script>
 </body>
 </html> 
